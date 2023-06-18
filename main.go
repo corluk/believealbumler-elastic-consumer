@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/corluk/believealbumler-elastic-consumer/models"
 	"github.com/segmentio/kafka-go"
@@ -68,8 +69,9 @@ func createReleaseIndex(index string) error {
 
 	return nil
 }
-func saveAudioItem(index string, item models.AudioItem) error {
-	uri := os.Getenv("ELASTIC_URI") + "/" + index + "/_doc/" + item.ID.Hex()
+func saveAudioItem(index string, key string, audioItem models.AudioItem) error {
+
+	uri := os.Getenv("ELASTIC_URI") + "/" + index + "/_doc/" + key
 
 	reqExists, err := http.NewRequest("HEAD", uri, nil)
 	if err != nil {
@@ -94,13 +96,12 @@ func saveAudioItem(index string, item models.AudioItem) error {
 
 		}
 	}
-	item.Source = "believe_albums"
 
-	b, err := json.Marshal(item)
+	b, err := json.Marshal(audioItem)
 	if err != nil {
 		return err
 	}
-	uri = os.Getenv("ELASTIC_URI") + "/" + index + "/_create/" + item.ID.Hex()
+	uri = os.Getenv("ELASTIC_URI") + "/" + index + "/_create/" + key
 	reqNew, err := http.NewRequest("PUT", uri, bytes.NewBuffer(b))
 	if err != nil {
 		return err
@@ -109,7 +110,13 @@ func saveAudioItem(index string, item models.AudioItem) error {
 	if err != nil {
 		return err
 	}
-	if respNew.StatusCode != 200 {
+	//str, err := ioutil.ReadAll(respNew.Body)
+	/*if err != nil {
+		return err
+	}
+	*/
+	//fmt.Println(str)
+	if respNew.StatusCode != 201 {
 		return errors.New("bad response code " + strconv.Itoa(respNew.StatusCode))
 
 	}
@@ -117,9 +124,9 @@ func saveAudioItem(index string, item models.AudioItem) error {
 	return nil
 
 }
-func run(item models.AudioItem) error {
+func run(item models.Message) error {
 
-	return saveAudioItem("releases", item)
+	return saveAudioItem("believe_albums", item.Key.Hex(), item.Value)
 
 }
 
@@ -127,28 +134,32 @@ func readKafka(channel chan models.AudioItem) {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: strings.Split(os.Getenv("KAFKA_BROKERS"), ","),
 
-		Topic: "test-believealbum-search",
+		Topic: "test-believealbum-search-with-key",
 	})
 	reader.SetOffset(0)
 	fmt.Println("starting thread")
 	total := 0
 	for {
-		var audioItem models.AudioItem
-		message, err := reader.ReadMessage(context.Background())
+		var message models.Message
+
+		incomingMessage, err := reader.ReadMessage(context.Background())
 		total = total + 1
-		strmsg := string(message.Value)
-		fmt.Printf("incoming message %s", strmsg)
+		date := time.Now()
+
+		fmt.Printf("message time %s\n", date.String())
+
 		if err != nil {
 			fmt.Printf("error reading message %s", err.Error())
 			continue
 		}
-		err = json.Unmarshal(message.Value, &audioItem)
+		err = json.Unmarshal(incomingMessage.Value, &message)
+
 		if err != nil {
 			fmt.Printf("unmarshall %s", err.Error())
 
 			continue
 		}
-		err = run(audioItem)
+		err = run(message)
 		if err != nil {
 			panic(err)
 		}
@@ -162,7 +173,8 @@ func main() {
 	os.Setenv("ELASTIC_USER", "elastic")
 	os.Setenv("ELASTIC_PASS", "AeYhdH2BLhSjmWp3sSvq")
 	os.Setenv("ELASTIC_URI", "http://localhost:9200")
-	err := createReleaseIndex("releases")
+
+	err := createReleaseIndex("believe_albums")
 	if err != nil {
 		panic(err)
 	}
@@ -174,9 +186,7 @@ func main() {
 	select {
 
 	case audioItem := <-chanAudioItem:
-
-		run(audioItem)
-
+		fmt.Println(audioItem)
 	case <-gracefulStop:
 		os.Exit(0)
 

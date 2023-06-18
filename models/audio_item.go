@@ -6,14 +6,18 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+type Message struct {
+	Key   primitive.ObjectID `json:"key"`
+	Value AudioItem          `json:"item"`
+}
 type AudioItem struct {
-	ID           primitive.ObjectID `json:"_id" bson:"_id"`
-	Id           int                `json:"id"`
-	Url          string             `json:"url"`
-	Type         string             `json:"type"`
-	Status       string             `json:"status"`
-	LastModified time.Time          `json:"lastModified"`
-	Title        string             `json:"title"`
+	//ID           primitive.ObjectID `json:"-"`
+	Id           int       `json:"id"`
+	Url          string    `json:"url"`
+	Type         string    `json:"type"`
+	Status       string    `json:"status"`
+	LastModified time.Time `json:"lastModified"`
+	Title        string    `json:"title"`
 
 	Fetched      bool      `json:"fetched"`
 	ArtistName   string    `json:"artistName"`
