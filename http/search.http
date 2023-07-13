@@ -1,0 +1,11 @@
+POST http://localhost:9200/believe_albums/_search 
+Authorization: Basic ZWxhc3RpYzpBZVloZEgyQkxoU2ptV3Azc1N2cQ==
+Content-Type: application/json
+
+{
+    "query" : {
+        "query_string" : {
+            "query" : "*gülabi*"
+        }
+    }
+}
